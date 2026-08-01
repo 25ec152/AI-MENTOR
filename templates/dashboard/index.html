@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Mentor{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <div class="dashboard-header">
+    <div>
+      <h1>Innovation Sessions</h1>
+      <p class="dash-sub">Select a session to continue, or start a new one</p>
+    </div>
+    <button class="btn btn-primary"
+            onclick="document.getElementById('new-session-modal').style.display='flex'">
+      <i class="fa-solid fa-plus"></i> New Session
+    </button>
+  </div>
+
+  <!-- ── Session grid ───────────────────────────────────────── -->
+  {% if sessions %}
+    <div class="session-grid">
+      {% for s in sessions %}
+        <div class="session-card stage-{{ s.stage }}">
+
+          <div class="session-card-header">
+            <span class="stage-badge">{{ s.stage | capitalize }}</span>
+            <span class="session-date">
+              <i class="fa-regular fa-calendar"></i>
+              {{ s.updated_at.strftime('%b %d, %Y') }}
+            </span>
+          </div>
+
+          <h3 class="session-title">{{ s.title }}</h3>
+
+          <div class="session-actions">
+            <a href="{{ url_for('mentor.chat', session_id=s.id) }}"
+               class="btn btn-sm btn-primary">
+              <i class="fa-solid fa-comments"></i> Open
+            </a>
+            <form method="POST"
+                  action="{{ url_for('dashboard.delete_session', session_id=s.id) }}"
+                  onsubmit="return confirm('Delete this session?');"
+                  style="display:inline;">
+              <button type="submit" class="btn btn-sm btn-danger">
+                <i class="fa-solid fa-trash"></i> Delete
+              </button>
+            </form>
+          </div>
+
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon"><i class="fa-solid fa-rocket"></i></div>
+      <p>No sessions yet — start your first innovation journey!</p>
+      <button class="btn btn-primary"
+              onclick="document.getElementById('new-session-modal').style.display='flex'">
+        <i class="fa-solid fa-plus"></i> Create First Session
+      </button>
+    </div>
+  {% endif %}
+
+</div><!-- /dashboard -->
+
+<!-- ── New Session Modal ──────────────────────────────────── -->
+<div id="new-session-modal" class="modal-overlay" style="display:none;">
+  <div class="modal">
+    <h2>
+      <i class="fa-solid fa-wand-magic-sparkles" style="color:#8b5cf6;"></i>
+      New Session
+    </h2>
+    <form method="POST" action="{{ url_for('dashboard.new_session') }}">
+      <div class="form-group">
+        <label for="title">
+          <i class="fa-solid fa-pen"></i> Session Title
+        </label>
+        <input type="text" id="title" name="title" required
+               placeholder="e.g. AI-Powered Customer Support" />
+      </div>
+      <div class="form-group">
+        <label for="stage">
+          <i class="fa-solid fa-layer-group"></i> Innovation Stage
+        </label>
+        <select id="stage" name="stage">
+          <option value="ideation">Ideation</option>
+          <option value="prototype">Prototype</option>
+          <option value="scale">Scale</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-secondary"
+                onclick="document.getElementById('new-session-modal').style.display='none'">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary">
+          <i class="fa-solid fa-bolt"></i> Create
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

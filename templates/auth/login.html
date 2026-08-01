@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Sign In — AI Mentor{% endblock %}
+
+{% block content %}
+<div class="auth-wrapper">
+  <div class="auth-card">
+    <h1>Welcome back</h1>
+    <p class="auth-tagline">Sign in to your AI Innovation workspace</p>
+
+    <form method="POST" action="{{ url_for('auth.login') }}">
+      <div class="form-group">
+        <label for="email">
+          <i class="fa-solid fa-envelope"></i> Email
+        </label>
+        <input type="email" id="email" name="email" required autofocus
+               placeholder="you@example.com" autocomplete="email" />
+      </div>
+
+      <div class="form-group">
+        <label for="password">
+          <i class="fa-solid fa-lock"></i> Password
+        </label>
+        <input type="password" id="password" name="password" required
+               placeholder="••••••••" autocomplete="current-password" />
+      </div>
+
+      <button type="submit" class="btn btn-primary" style="width:100%;margin-top:8px;padding:13px;">
+        <i class="fa-solid fa-arrow-right-to-bracket"></i> Sign In
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      No account? <a href="{{ url_for('auth.register') }}">Create one here</a>
+    </p>
+  </div>
+</div>
+{% endblock %}

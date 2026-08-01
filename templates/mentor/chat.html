@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ session.title }} — AI Mentor{% endblock %}
+
+{% block content %}
+<div class="chat-layout">
+
+  <!-- ── Sidebar ────────────────────────────────────────────── -->
+  <aside class="chat-sidebar">
+
+    <div>
+      <h3><i class="fa-solid fa-folder-open"></i> Session</h3>
+      <p class="session-name">{{ session.title }}</p>
+    </div>
+
+    <div>
+      <h4><i class="fa-solid fa-stairs"></i> Stage</h4>
+      <div class="stage-selector">
+        {% for stage in ['ideation', 'prototype', 'scale'] %}
+          <button class="stage-btn {% if session.stage == stage %}active{% endif %}"
+                  data-stage="{{ stage }}"
+                  onclick="setStage('{{ stage }}')">
+            {{ stage | capitalize }}
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <a href="{{ url_for('dashboard.index') }}" class="btn btn-secondary sidebar-back">
+      <i class="fa-solid fa-arrow-left"></i> Dashboard
+    </a>
+
+  </aside>
+
+  <!-- ── Chat window ────────────────────────────────────────── -->
+  <div class="chat-main">
+
+    <div id="chat-messages" class="chat-messages">
+      {% if not messages %}
+        <div class="chat-welcome">
+          <div class="chat-welcome-icon"><i class="fa-solid fa-robot"></i></div>
+          <strong>Aria is ready to help.</strong>
+          <p>Describe your AI idea or challenge to get started.</p>
+        </div>
+      {% endif %}
+
+      {% for msg in messages %}
+        <div class="message message-{{ msg.role }}">
+          <span class="message-role">
+            {% if msg.role == 'user' %}
+              <i class="fa-solid fa-circle-user"></i> You
+            {% else %}
+              <i class="fa-solid fa-robot"></i> Aria
+            {% endif %}
+          </span>
+          <div class="message-content">{{ msg.content }}</div>
+        </div>
+      {% endfor %}
+    </div>
+
+    <form id="chat-form" class="chat-form">
+      <textarea id="chat-input" name="message" rows="3"
+                placeholder="Ask Aria anything about your innovation…"></textarea>
+      <button type="submit" id="send-btn" class="btn btn-primary">
+        <i class="fa-solid fa-paper-plane"></i> Send
+      </button>
+    </form>
+
+  </div><!-- /chat-main -->
+</div><!-- /chat-layout -->
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chat.js') }}"></script>
+<script>
+  const SESSION_ID = {{ session.id }};
+</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}AI Innovation Mentor{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700;800&display=swap" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
+</head>
+<body>
+
+  <!-- ── Navbar ──────────────────────────────────────────────── -->
+  <nav class="navbar">
+    <a class="brand" href="{{ url_for('dashboard.index') }}">
+      <span class="brand-icon"><i class="fa-solid fa-brain"></i></span>
+      <span class="brand-text">AI Mentor</span>
+    </a>
+
+    <div class="nav-links">
+      {% if current_user.is_authenticated %}
+        <span class="nav-user">
+          <i class="fa-solid fa-circle-user"></i>
+          {{ current_user.username }}
+        </span>
+        <a href="{{ url_for('dashboard.index') }}">
+          <i class="fa-solid fa-gauge-high"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="{{ url_for('voice.index') }}">
+          <i class="fa-solid fa-microphone"></i>
+          <span>Voice</span>
+        </a>
+        <a href="{{ url_for('auth.logout') }}" class="nav-logout">
+          <i class="fa-solid fa-arrow-right-from-bracket"></i>
+          <span>Logout</span>
+        </a>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i>
+          <span>Login</span>
+        </a>
+        <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-sm">
+          <i class="fa-solid fa-user-plus"></i>
+          <span>Register</span>
+        </a>
+      {% endif %}
+    </div>
+  </nav>
+
+  <!-- ── Main content ────────────────────────────────────────── -->
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }}">
+              <i class="fa-solid
+                {% if category == 'success' %}fa-circle-check
+                {% elif category == 'danger'  %}fa-circle-xmark
+                {% elif category == 'warning' %}fa-triangle-exclamation
+                {% else %}fa-circle-info{% endif %}"></i>
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

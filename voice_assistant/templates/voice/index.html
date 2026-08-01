@@ -1,0 +1,387 @@
+{% extends "base.html" %}
+
+{% block title %}Voice Assistant — AI Mentor{% endblock %}
+
+{% block content %}
+<div class="va-page">
+
+  <!-- ── Page header ──────────────────────────────────────────── -->
+  <div class="va-header">
+    <h1 class="va-title">
+      <i class="fa-solid fa-microphone-lines"></i> Voice Assistant
+    </h1>
+    <p class="va-subtitle">
+      Press <strong>Speak</strong> and tell me what to do — open apps, check the
+      time, search Google, and more.
+    </p>
+  </div>
+
+  <!-- ── Mic card ─────────────────────────────────────────────── -->
+  <div class="va-card" style="text-align:center;">
+
+    <!-- Animated mic ring — id="micRing" used by JS -->
+    <div class="va-mic-ring" id="micRing">
+      <div class="va-mic-icon" id="micIcon">&#127908;</div>
+    </div>
+
+    <!-- Sound wave bars (shown while listening) -->
+    <div class="va-soundwave" id="soundwave">
+      <span></span><span></span><span></span><span></span>
+      <span></span><span></span><span></span>
+    </div>
+
+    <!-- Status label — id="statusLabel" used by JS -->
+    <p class="va-status" id="statusLabel">Ready — press Speak to start</p>
+
+    <!-- Controls — id="speakBtn" and id="stopBtn" used by JS -->
+    <div class="va-controls">
+      <button class="btn btn-primary va-btn-speak" id="speakBtn">
+        <i class="fa-solid fa-circle"></i> Speak
+      </button>
+      <button class="btn btn-secondary va-btn-stop" id="stopBtn" disabled>
+        <i class="fa-solid fa-stop"></i> Stop
+      </button>
+    </div>
+
+    <!-- Hidden audio element — id="ttsAudio" used by JS -->
+    <audio id="ttsAudio" style="display:none;"></audio>
+  </div>
+
+  <!-- ── Conversation panel — id="conversationPanel" used by JS ── -->
+  <div class="va-card va-conversation" id="conversationPanel" style="display:none;">
+    <h2 class="va-section-title">
+      <i class="fa-solid fa-comments" style="font-size:12px;opacity:0.7;"></i>
+      Last Interaction
+    </h2>
+
+    <div class="va-row">
+      <span class="va-label">
+        <i class="fa-solid fa-quote-left"></i> You said
+      </span>
+      <!-- id="transcriptText" used by JS -->
+      <p class="va-transcript" id="transcriptText">—</p>
+    </div>
+
+    <div class="va-row">
+      <span class="va-label">
+        <i class="fa-solid fa-tag"></i> Intent detected
+      </span>
+      <!-- id="intentBadge" used by JS -->
+      <span class="va-badge" id="intentBadge">—</span>
+    </div>
+
+    <div class="va-row">
+      <span class="va-label">
+        <i class="fa-solid fa-robot"></i> Assistant reply
+      </span>
+      <!-- id="replyText" used by JS -->
+      <p class="va-reply" id="replyText">—</p>
+    </div>
+  </div>
+
+  <!-- ── Capabilities quick-reference ─────────────────────────── -->
+  <div class="va-card">
+    <h2 class="va-section-title">
+      <i class="fa-solid fa-bolt" style="font-size:11px;opacity:0.7;"></i>
+      What can I do?
+    </h2>
+    <div class="va-caps-grid">
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#128187;</span>
+        <div>
+          <strong>Open apps</strong>
+          <p>"Open Chrome", "Launch VS Code", "Start Calculator"</p>
+        </div>
+      </div>
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#127758;</span>
+        <div>
+          <strong>Open websites</strong>
+          <p>"Open YouTube", "Go to Gmail", "Open GitHub"</p>
+        </div>
+      </div>
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#128269;</span>
+        <div>
+          <strong>Google Search</strong>
+          <p>"Search for Python tutorials", "Google the weather"</p>
+        </div>
+      </div>
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#128336;</span>
+        <div>
+          <strong>Time &amp; Date</strong>
+          <p>"What time is it?", "What is today's date?"</p>
+        </div>
+      </div>
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#128267;</span>
+        <div>
+          <strong>Battery</strong>
+          <p>"Battery percentage", "How much battery do I have?"</p>
+        </div>
+      </div>
+
+      <div class="va-cap-item">
+        <span class="va-cap-icon">&#128274;</span>
+        <div>
+          <strong>System control</strong>
+          <p>"Lock the laptop", "Restart", "Shutdown"</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /va-page -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+/*
+ * Voice Assistant - microphone control.
+ *
+ * WHY WAV ENCODING IN THE BROWSER?
+ * ---------------------------------
+ * SpeechRecognition.AudioFile on the server only understands PCM WAV,
+ * AIFF, and FLAC.  Chrome MediaRecorder produces WebM/Opus by default;
+ * Firefox produces OGG/Opus.  Neither can be opened by sr.AudioFile.
+ *
+ * The fix stays entirely in the browser:
+ *   1. MediaRecorder captures the raw mic stream as a WebM/Opus blob.
+ *   2. AudioContext.decodeAudioData() decodes it into a raw AudioBuffer.
+ *   3. encodeWAV() packs those PCM samples into a standard RIFF/WAV file.
+ *   4. The WAV blob is POSTed to /voice/listen - server reads it with sr.
+ *
+ * Zero server-side codec libraries required (no pydub, no ffmpeg).
+ */
+(function () {
+  "use strict";
+
+  const speakBtn          = document.getElementById("speakBtn");
+  const stopBtn           = document.getElementById("stopBtn");
+  const micRing           = document.getElementById("micRing");
+  const statusLabel       = document.getElementById("statusLabel");
+  const conversationPanel = document.getElementById("conversationPanel");
+  const transcriptText    = document.getElementById("transcriptText");
+  const intentBadge       = document.getElementById("intentBadge");
+  const replyText         = document.getElementById("replyText");
+  const ttsAudio          = document.getElementById("ttsAudio");
+  const soundwave         = document.getElementById("soundwave");
+
+  let mediaRecorder = null;
+  let audioChunks   = [];
+
+  /* ---------- UI helpers ------------------------------------------ */
+
+  function setListening(active) {
+    speakBtn.disabled = active;
+    stopBtn.disabled  = !active;
+    micRing.classList.toggle("listening", active);
+    if (soundwave) soundwave.classList.toggle("active", active);
+    if (active) {
+      statusLabel.classList.add("active");
+      stopBtn.classList.add("active-stop");
+    } else {
+      statusLabel.classList.remove("active");
+      stopBtn.classList.remove("active-stop");
+    }
+    statusLabel.textContent = active
+      ? "Listening... speak now"
+      : "Ready - press Speak to start";
+  }
+
+  function showResult(transcript, intent, reply, audiob64) {
+    transcriptText.textContent      = transcript || "(nothing recognised)";
+    intentBadge.textContent         = intent     || "unknown";
+    replyText.textContent           = reply      || "-";
+    conversationPanel.style.display = "block";
+
+    if (audiob64) {
+      ttsAudio.src = "data:audio/mpeg;base64," + audiob64;
+      ttsAudio.style.display = "block";
+      ttsAudio.play();
+    }
+  }
+
+  /* ---------- WAV encoder ----------------------------------------- */
+
+  function writeUint32LE(view, offset, value) {
+    view.setUint32(offset, value, true);
+  }
+
+  function writeUint16LE(view, offset, value) {
+    view.setUint16(offset, value, true);
+  }
+
+  /**
+   * Encode an AudioBuffer as a RIFF/PCM WAV Blob.
+   * Always down-mixes to mono 16-bit samples for Google Speech Recognition.
+   */
+  function encodeWAV(audioBuffer) {
+    const numChannels    = 1;
+    const sampleRate     = audioBuffer.sampleRate;
+    const bitsPerSample  = 16;
+    const bytesPerSample = 2;
+
+    // Down-mix to mono by averaging all input channels.
+    const inputChannels = [];
+    for (let c = 0; c < audioBuffer.numberOfChannels; c++) {
+      inputChannels.push(audioBuffer.getChannelData(c));
+    }
+    const numFrames   = audioBuffer.length;
+    const monoSamples = new Float32Array(numFrames);
+    for (let i = 0; i < numFrames; i++) {
+      let sum = 0;
+      for (let c = 0; c < inputChannels.length; c++) sum += inputChannels[c][i];
+      monoSamples[i] = sum / inputChannels.length;
+    }
+
+    // Float32 [-1, 1] -> Int16 [-32768, 32767]
+    const pcmData = new Int16Array(numFrames);
+    for (let i = 0; i < numFrames; i++) {
+      const s = Math.max(-1, Math.min(1, monoSamples[i]));
+      pcmData[i] = s < 0 ? s * 32768 : s * 32767;
+    }
+
+    const dataByteLength = numFrames * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataByteLength);
+    const view   = new DataView(buffer);
+
+    // RIFF chunk descriptor
+    view.setUint8(0, 0x52); view.setUint8(1, 0x49); // R I
+    view.setUint8(2, 0x46); view.setUint8(3, 0x46); // F F
+    writeUint32LE(view, 4, 36 + dataByteLength);
+    view.setUint8(8,  0x57); view.setUint8(9,  0x41); // W A
+    view.setUint8(10, 0x56); view.setUint8(11, 0x45); // V E
+
+    // fmt sub-chunk
+    view.setUint8(12, 0x66); view.setUint8(13, 0x6D); // f m
+    view.setUint8(14, 0x74); view.setUint8(15, 0x20); // t [space]
+    writeUint32LE(view, 16, 16);
+    writeUint16LE(view, 20, 1);                          // PCM = 1
+    writeUint16LE(view, 22, numChannels);
+    writeUint32LE(view, 24, sampleRate);
+    writeUint32LE(view, 28, sampleRate * numChannels * bytesPerSample);
+    writeUint16LE(view, 32, numChannels * bytesPerSample);
+    writeUint16LE(view, 34, bitsPerSample);
+
+    // data sub-chunk
+    view.setUint8(36, 0x64); view.setUint8(37, 0x61); // d a
+    view.setUint8(38, 0x74); view.setUint8(39, 0x61); // t a
+    writeUint32LE(view, 40, dataByteLength);
+    new Int16Array(buffer, 44).set(pcmData);
+
+    return new Blob([buffer], { type: "audio/wav" });
+  }
+
+  /**
+   * Decode a MediaRecorder Blob (WebM/OGG) into a WAV Blob via the
+   * browser's built-in Web Audio API.  No external libraries needed.
+   */
+  async function blobToWav(blob) {
+    const arrayBuffer  = await blob.arrayBuffer();
+    const audioContext = new AudioContext();
+    try {
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      return encodeWAV(audioBuffer);
+    } finally {
+      audioContext.close();  // always release system audio resources
+    }
+  }
+
+  /* ---------- TTS helper ------------------------------------------ */
+
+  /**
+   * Speak text aloud using the browser SpeechSynthesis API.
+   * Falls back silently if the API is unavailable.
+   */
+  function speakText(text) {
+    if (!window.speechSynthesis || !text) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    window.speechSynthesis.speak(utterance);
+  }
+
+  /* ---------- Button handlers ------------------------------------- */
+
+  speakBtn.addEventListener("click", async function () {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunks   = [];
+      mediaRecorder = new MediaRecorder(stream);
+
+      mediaRecorder.addEventListener("dataavailable", function (e) {
+        if (e.data.size > 0) audioChunks.push(e.data);
+      });
+
+      mediaRecorder.addEventListener("stop", async function () {
+        setListening(false);
+        // Release the mic indicator in the browser toolbar immediately.
+        stream.getTracks().forEach(t => t.stop());
+
+        try {
+          // Step 1: combine chunks into a single WebM/Opus blob.
+          const rawBlob = new Blob(audioChunks, { type: "audio/webm" });
+
+          // Step 2: decode WebM -> PCM -> re-encode as RIFF WAV.
+          // sr.AudioFile on the server requires PCM WAV.
+          statusLabel.textContent = "Encoding WAV...";
+          const wavBlob = await blobToWav(rawBlob);
+
+          // Step 3: POST the WAV file to the Flask route.
+          statusLabel.textContent = "Processing...";
+          const formData = new FormData();
+          formData.append("audio", wavBlob, "recording.wav");
+
+          const response = await fetch("/voice/listen", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            statusLabel.textContent = "Error: " + (err.error || response.statusText);
+            return;
+          }
+
+          const data = await response.json();
+          statusLabel.textContent = "Done - ready for next command";
+
+          const replyMsg = data.message || data.reply || "";
+          showResult(data.transcript, data.intent, replyMsg, data.audio_b64);
+
+          // Speak the reply aloud if there is no server-side audio blob.
+          if (!data.audio_b64 && replyMsg) {
+            speakText(replyMsg);
+          }
+
+        } catch (err) {
+          statusLabel.textContent = "Error: " + err.message;
+          console.error("Voice assistant error:", err);
+        }
+      });
+
+      mediaRecorder.start();
+      setListening(true);
+
+    } catch (permErr) {
+      statusLabel.textContent = "Microphone access denied. Please allow mic access.";
+      console.error(permErr);
+    }
+  });
+
+  stopBtn.addEventListener("click", function () {
+    if (mediaRecorder && mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  });
+
+}());
+</script>
+{% endblock %}
